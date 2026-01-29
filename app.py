@@ -10,10 +10,10 @@ def home():
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    data = request.get_json(force=True)
+    data = request.get_json(silent=True)
 
     if not data or "prompt" not in data:
-        return jsonify({"error": "Missing prompt"}), 400
+        return jsonify({"error": "JSON inválido o falta 'prompt'"}), 400
 
     prompt = data["prompt"]
 
@@ -32,11 +32,11 @@ def chat():
             "messages": [
                 {"role": "user", "content": prompt}
             ]
-        },
-        timeout=30
+        }
     )
 
     return jsonify(response.json())
+
 
 # 🔴 ESTO ES LO QUE TE FALTABA
 if __name__ == "__main__":

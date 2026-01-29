@@ -10,8 +10,12 @@ def home():
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    data = request.json or {}
-    prompt = data.get("prompt", "")
+    data = request.get_json(force=True)
+
+    if not data or "prompt" not in data:
+        return jsonify({"error": "Missing prompt"}), 400
+
+    prompt = data["prompt"]
 
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
@@ -27,14 +31,12 @@ def chat():
             "model": "mistralai/mistral-7b-instruct",
             "messages": [
                 {"role": "user", "content": prompt}
-            ],
-            "temperature": 0.3
+            ]
         },
         timeout=30
     )
 
     return jsonify(response.json())
-
 
 # 🔴 ESTO ES LO QUE TE FALTABA
 if __name__ == "__main__":

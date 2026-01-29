@@ -10,7 +10,7 @@ def home():
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    data = request.json
+    data = request.json or {}
     prompt = data.get("prompt", "")
 
     api_key = os.getenv("OPENROUTER_API_KEY")
@@ -27,8 +27,16 @@ def chat():
             "model": "mistralai/mistral-7b-instruct",
             "messages": [
                 {"role": "user", "content": prompt}
-            ]
-        }
+            ],
+            "temperature": 0.3
+        },
+        timeout=30
     )
 
     return jsonify(response.json())
+
+
+# 🔴 ESTO ES LO QUE TE FALTABA
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)

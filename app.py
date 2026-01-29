@@ -1,44 +1,34 @@
 import os
 from flask import Flask, request, jsonify
-import requests
+import google.generativeai as genai
 
 app = Flask(__name__)
 
-@app.route("/")
-def home():
-    return "Backend IA activo"
+# Cargar la clave de entorno
+api_key = os.getenv("GEMINI_API_KEY")
+
+# Configurar el cliente de Gemini
+genai.configure(api_key=api_key)
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    data = request.get_json(silent=True)
+    data = request.json
+    prompt = data.get("prompt")
 
-    if not data or "prompt" not in data:
-        return jsonify({"error": "JSON inválido o falta 'prompt'"}), 400
+    if not prompt:
+        return jsonify({"error": "Falta prompt"}), 400
 
-    prompt = data["prompt"]
+    try:
+        # Llamada a Gemini
+        response = genai.generate_text(
+            model="gemini-2.5-flash",
+            prompt=prompt,
+            max_output_tokens=200
+        )
+        return jsonify({"response": response.text})
 
-    api_key = os.getenv("OPENROUTER_API_KEY")
-    if not api_key:
-        return jsonify({"error": "No API key"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-    response = requests.post(
-        "https://openrouter.ai/api/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        },
-        json={
-            "model": "mistralai/mistral-7b-instruct",
-            "messages": [
-                {"role": "user", "content": prompt}
-            ]
-        }
-    )
-
-    return jsonify(response.json())
-
-
-# 🔴 ESTO ES LO QUE TE FALTABA
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
+    app.run()

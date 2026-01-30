@@ -238,7 +238,7 @@ def run_agente():
         body = data.get("body", "")
 
         # 2️⃣ Filtrar remitente (solo correo de prueba)
-        if "giovanni.20032026@outlook.com" not in sender.lower():
+        if "giova4295@gmail.com" not in sender.lower():
             return jsonify({"message": "Remitente no autorizado"}), 200
 
         # 3️⃣ Obtener información oficial desde Supabase
@@ -302,7 +302,7 @@ Respuesta:
 
         mail = Mail(
             from_email=os.getenv("SENDGRID_FROM_EMAIL"),
-            to_emails="giovanni.20032026@outlook.com",
+            to_emails="giova4295@gmail.com",
             subject=f"RE: {subject}",
             plain_text_content=respuesta
         )

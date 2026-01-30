@@ -96,5 +96,19 @@ Responde de forma formal, clara y amable.
         }), 500
 
 
+
+@app.route("/info", methods=["GET"])
+def info_servicios():
+    try:
+        info = obtener_info_servicios()
+        return jsonify(info)
+    except Exception as e:
+        return jsonify({
+            "error": "Error al obtener información",
+            "details": str(e)
+        }), 500
+
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)

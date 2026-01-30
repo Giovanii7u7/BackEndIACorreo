@@ -111,6 +111,44 @@ def info_servicios():
         }), 500
 
 
+@app.route("/info", methods=["PUT"])
+def actualizar_info_servicios():
+    try:
+        data = request.get_json()
+
+        fechas = data.get("fechas_escolares")
+        costos = data.get("costos")
+        becas = data.get("becas")
+
+        if not fechas or not costos or not becas:
+            return jsonify({"error": "Datos incompletos"}), 400
+
+        url = f"{SUPABASE_URL}/rest/v1/servicios_escolares_info"
+        headers = {
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal"
+        }
+
+        payload = {
+            "fechas_escolares": fechas,
+            "costos": costos,
+            "becas": becas
+        }
+
+        r = requests.post(url, headers=headers, json=payload, timeout=10)
+        r.raise_for_status()
+
+        return jsonify({"message": "Información actualizada correctamente"})
+
+    except Exception as e:
+        return jsonify({
+            "error": "Error al actualizar información",
+            "details": str(e)
+        }), 500
+
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)

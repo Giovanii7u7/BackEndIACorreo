@@ -222,7 +222,6 @@ def actualizar_config_agente():
             "details": str(e)
         }), 500
 
-
 @app.route("/run", methods=["POST"])
 def run_agente():
     try:
@@ -238,17 +237,23 @@ def run_agente():
         subject = data.get("subject", "")
         body = data.get("body", "")
 
-        # 2️⃣ Filtrar remitente (SOLO tu correo de prueba)
+        # 2️⃣ Filtrar remitente (solo correo de prueba)
         if "giovanni.20032026@outlook.com" not in sender.lower():
             return jsonify({"message": "Remitente no autorizado"}), 200
 
-        # 3️⃣ Obtener info oficial
+        # 3️⃣ Obtener información oficial desde Supabase
         info = obtener_info_servicios()
 
+        # 🔒 CONTEXTO ESTRICTO (fuente única de verdad)
         contexto = f"""
-Eres el área de Servicios Escolares.
+Actúas exclusivamente como el Departamento de Servicios Escolares.
 
-Información oficial vigente:
+La siguiente información es la ÚNICA información oficial disponible.
+NO debes usar conocimiento externo.
+NO debes inventar fechas, requisitos, costos ni procedimientos.
+Si algo no está explícitamente en la información, debes indicarlo claramente.
+
+INFORMACIÓN OFICIAL:
 
 FECHAS:
 {info.get("fechas_escolares")}
@@ -260,25 +265,37 @@ BECAS:
 {info.get("becas")}
 """
 
+        # 🎯 PROMPT CONTROLADO
         prompt = f"""
 {contexto}
 
 Correo recibido:
 Asunto: {subject}
 
-Contenido:
+Pregunta del usuario:
 {body}
 
-Redacta una respuesta formal y clara como Servicios Escolares.
+INSTRUCCIONES ESTRICTAS:
+- Responde ÚNICAMENTE a lo que el usuario pregunta.
+- NO agregues información adicional.
+- NO incluyas fechas, costos o datos que no sean necesarios para responder.
+- Si la información solicitada no está en los datos oficiales, responde:
+  "Esa información no se encuentra disponible en este momento en Servicios Escolares."
+- Usa un tono formal, claro y directo.
+- NO incluyas despedidas largas ni textos promocionales.
+
+Respuesta:
 """
 
-        # 4️⃣ Gemini
+        # 4️⃣ Llamar a Gemini
         response = client.models.generate_content(
             model="gemini-3-flash-preview",
             contents=prompt
         )
 
-        respuesta = response.text
+        respuesta = response.text.strip() if response.text else (
+            "Por el momento no es posible responder su consulta. Intente más tarde."
+        )
 
         # 5️⃣ Enviar correo con SendGrid
         sg = SendGridAPIClient(os.getenv("SENDGRID_API_KEY"))
@@ -295,13 +312,11 @@ Redacta una respuesta formal y clara como Servicios Escolares.
         return jsonify({"message": "Correo respondido correctamente"}), 200
 
     except Exception as e:
+        print("ERROR EN /run:", str(e))
         return jsonify({
             "error": "Error en agente",
             "details": str(e)
         }), 500
-
-
-
 
 
 if __name__ == "__main__":

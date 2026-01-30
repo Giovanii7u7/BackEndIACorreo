@@ -3,6 +3,9 @@ import requests
 from flask import Flask, request, jsonify
 from google import genai
 from flask_cors import CORS
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
+
 
 app = Flask(__name__)
 CORS(app)
@@ -37,6 +40,29 @@ def obtener_info_servicios():
 
     data = r.json()
     return data[0] if data else {}
+
+
+def obtener_estado_agente():
+    url = f"{SUPABASE_URL}/rest/v1/config_agente"
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Accept": "application/json"
+    }
+    params = {
+        "select": "activo",
+        "order": "updated_at.desc",
+        "limit": 1
+    }
+
+    r = requests.get(url, headers=headers, params=params, timeout=10)
+    r.raise_for_status()
+
+    data = r.json()
+    return data[0]["activo"] if data else False
+
+
+
 
 
 @app.route("/")
@@ -147,6 +173,134 @@ def actualizar_info_servicios():
             "error": "Error al actualizar información",
             "details": str(e)
         }), 500
+
+
+
+@app.route("/config/agente", methods=["GET"])
+def obtener_config_agente():
+    try:
+        activo = obtener_estado_agente()
+        return jsonify({"activo": activo})
+    except Exception as e:
+        return jsonify({
+            "error": "Error al obtener estado del agente",
+            "details": str(e)
+        }), 500
+
+
+
+
+@app.route("/config/agente", methods=["PUT"])
+def actualizar_config_agente():
+    try:
+        data = request.get_json()
+        activo = data.get("activo")
+
+        if activo is None:
+            return jsonify({"error": "Falta campo 'activo'"}), 400
+
+        url = f"{SUPABASE_URL}/rest/v1/config_agente"
+        headers = {
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal"
+        }
+
+        payload = {
+            "activo": bool(activo)
+        }
+
+        r = requests.post(url, headers=headers, json=payload, timeout=10)
+        r.raise_for_status()
+
+        return jsonify({"message": "Estado del agente actualizado"})
+
+    except Exception as e:
+        return jsonify({
+            "error": "Error al actualizar estado del agente",
+            "details": str(e)
+        }), 500
+
+
+@app.route("/run", methods=["POST"])
+def run_agente():
+    try:
+        # 1️⃣ Verificar agente activo
+        if not obtener_estado_agente():
+            return jsonify({"message": "Agente desactivado"}), 200
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "JSON inválido"}), 400
+
+        sender = data.get("from", "")
+        subject = data.get("subject", "")
+        body = data.get("body", "")
+
+        # 2️⃣ Filtrar remitente (SOLO tu correo de prueba)
+        if "giovanni.20032026@outlook.com" not in sender.lower():
+            return jsonify({"message": "Remitente no autorizado"}), 200
+
+        # 3️⃣ Obtener info oficial
+        info = obtener_info_servicios()
+
+        contexto = f"""
+Eres el área de Servicios Escolares.
+
+Información oficial vigente:
+
+FECHAS:
+{info.get("fechas_escolares")}
+
+COSTOS:
+{info.get("costos")}
+
+BECAS:
+{info.get("becas")}
+"""
+
+        prompt = f"""
+{contexto}
+
+Correo recibido:
+Asunto: {subject}
+
+Contenido:
+{body}
+
+Redacta una respuesta formal y clara como Servicios Escolares.
+"""
+
+        # 4️⃣ Gemini
+        response = client.models.generate_content(
+            model="gemini-3-flash-preview",
+            contents=prompt
+        )
+
+        respuesta = response.text
+
+        # 5️⃣ Enviar correo con SendGrid
+        sg = SendGridAPIClient(os.getenv("SENDGRID_API_KEY"))
+
+        mail = Mail(
+            from_email=os.getenv("SENDGRID_FROM_EMAIL"),
+            to_emails="giovanni.20032026@outlook.com",
+            subject=f"RE: {subject}",
+            plain_text_content=respuesta
+        )
+
+        sg.send(mail)
+
+        return jsonify({"message": "Correo respondido correctamente"}), 200
+
+    except Exception as e:
+        return jsonify({
+            "error": "Error en agente",
+            "details": str(e)
+        }), 500
+
+
 
 
 
